@@ -15,19 +15,18 @@
 
 package com.amazonaws.services.kinesis.samples.stocktrades.processor;
 
-import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ShutdownException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingException;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
-import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
+import com.amazonaws.services.kinesis.clientlibrary.lib.worker.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.kinesis.samples.stocktrades.model.StockTrade;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.List;
 
 /**
  * Processes records retrieved from stock trades stream.
@@ -84,6 +83,15 @@ public class StockTradeRecordProcessor implements IRecordProcessor {
         }
     }
 
+    @Override
+    public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason) {
+        LOG.info("Shutting down record processor for shard: " + kinesisShardId);
+        // Important to checkpoint after reaching end of shard, so we can start processing data from child shards.
+        if (shutdownReason == ShutdownReason.TERMINATE) {
+            checkpoint(iRecordProcessorCheckpointer);
+        }
+    }
+
     private void reportStats() {
         System.out.println("****** Shard " + kinesisShardId + " stats for last 1 minute ******\n" +
                 stockStats + "\n" +
@@ -103,17 +111,7 @@ public class StockTradeRecordProcessor implements IRecordProcessor {
         stockStats.addStockTrade(trade);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void shutdown(IRecordProcessorCheckpointer checkpointer, ShutdownReason reason) {
-        LOG.info("Shutting down record processor for shard: " + kinesisShardId);
-        // Important to checkpoint after reaching end of shard, so we can start processing data from child shards.
-        if (reason == ShutdownReason.TERMINATE) {
-            checkpoint(checkpointer);
-        }
-    }
+
 
     private void checkpoint(IRecordProcessorCheckpointer checkpointer) {
         LOG.info("Checkpointing shard " + kinesisShardId);
